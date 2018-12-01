@@ -199,7 +199,9 @@ class BlockList extends Component {
 						isDraggable={ isDraggable }
 					/>
 				) ) }
-				<BlockListAppender rootClientId={ rootClientId } />
+				{ blockClientIds.length === 0 &&
+					<BlockListAppender rootClientId={ rootClientId } />
+				}
 			</div>
 		);
 	}
