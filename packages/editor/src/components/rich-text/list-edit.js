@@ -71,6 +71,7 @@ export const ListEdit = ( { editor, onTagNameChange, tagName, onSyncDOM } ) => (
 		/>
 		<BlockFormatControls>
 			<Toolbar
+				className='list-format-toolbar'
 				controls={ [
 					{
 						icon: 'editor-ul',
