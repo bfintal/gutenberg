@@ -16,7 +16,6 @@ import { withSelect, withDispatch } from '@wordpress/data';
  * Internal dependencies
  */
 import BlockDropZone from '../block-drop-zone';
-import InserterWithShortcuts from '../inserter-with-shortcuts';
 import Inserter from '../inserter';
 
 export function DefaultBlockAppender( {
@@ -59,7 +58,6 @@ export function DefaultBlockAppender( {
 				onFocus={ onAppend }
 				value={ showPrompt ? value : '' }
 			/>
-			<InserterWithShortcuts rootClientId={ rootClientId } />
 			<Inserter position="top right" />
 		</div>
 	);
