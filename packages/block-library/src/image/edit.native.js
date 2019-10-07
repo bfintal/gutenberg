@@ -15,43 +15,49 @@ import { isEmpty } from 'lodash';
  * WordPress dependencies
  */
 import {
-	BottomSheet,
+	TextControl,
+	ToggleControl,
 	Icon,
 	Toolbar,
 	ToolbarButton,
+	PanelBody,
 } from '@wordpress/components';
+
 import {
+	Caption,
 	MediaPlaceholder,
 	MediaUpload,
+	MediaUploadProgress,
 	MEDIA_TYPE_IMAGE,
-	RichText,
 	BlockControls,
 	InspectorControls,
 } from '@wordpress/block-editor';
 import { __, sprintf } from '@wordpress/i18n';
 import { isURL } from '@wordpress/url';
 import { doAction, hasAction } from '@wordpress/hooks';
+import { withPreferredColorScheme } from '@wordpress/compose';
 
 /**
  * Internal dependencies
  */
 import styles from './styles.scss';
-import MediaUploadProgress from './media-upload-progress';
 import SvgIcon from './icon';
 import SvgIconRetry from './icon-retry';
+import { getUpdatedLinkTargetSettings } from './utils';
 
-const LINK_DESTINATION_CUSTOM = 'custom';
-const LINK_DESTINATION_NONE = 'none';
+import {
+	LINK_DESTINATION_CUSTOM,
+	LINK_DESTINATION_NONE,
+} from './constants';
 
 // Default Image ratio 4:3
 const IMAGE_ASPECT_RATIO = 4 / 3;
 
-class ImageEdit extends React.Component {
+export class ImageEdit extends React.Component {
 	constructor( props ) {
 		super( props );
 
 		this.state = {
-			showSettings: false,
 			isCaptionSelected: false,
 		};
 
@@ -63,6 +69,7 @@ class ImageEdit extends React.Component {
 		this.updateAlt = this.updateAlt.bind( this );
 		this.updateImageURL = this.updateImageURL.bind( this );
 		this.onSetLinkDestination = this.onSetLinkDestination.bind( this );
+		this.onSetNewTab = this.onSetNewTab.bind( this );
 		this.onImagePressed = this.onImagePressed.bind( this );
 		this.onClearSettings = this.onClearSettings.bind( this );
 		this.onFocusCaption = this.onFocusCaption.bind( this );
@@ -81,9 +88,9 @@ class ImageEdit extends React.Component {
 
 		if ( attributes.id && attributes.url && ! isURL( attributes.url ) ) {
 			if ( attributes.url.indexOf( 'file:' ) === 0 ) {
-				requestMediaImport( attributes.url, ( mediaId, mediaUri ) => {
-					if ( mediaUri ) {
-						setAttributes( { url: mediaUri, id: mediaId } );
+				requestMediaImport( attributes.url, ( id, url ) => {
+					if ( url ) {
+						setAttributes( { id, url } );
 					}
 				} );
 			}
@@ -115,7 +122,6 @@ class ImageEdit extends React.Component {
 			requestImageFailedRetryDialog( attributes.id );
 		}
 
-		this._caption.blur();
 		this.setState( {
 			isCaptionSelected: false,
 		} );
@@ -168,17 +174,24 @@ class ImageEdit extends React.Component {
 		} );
 	}
 
+	onSetNewTab( value ) {
+		const updatedLinkTarget = getUpdatedLinkTargetSettings( value, this.props.attributes );
+		this.props.setAttributes( updatedLinkTarget );
+	}
+
 	onClearSettings() {
 		this.props.setAttributes( {
 			alt: '',
 			linkDestination: LINK_DESTINATION_NONE,
 			href: undefined,
+			linkTarget: undefined,
+			rel: undefined,
 		} );
 	}
 
-	onSelectMediaUploadOption( mediaId, mediaUrl ) {
+	onSelectMediaUploadOption( { id, url } ) {
 		const { setAttributes } = this.props;
-		setAttributes( { url: mediaUrl, id: mediaId } );
+		setAttributes( { id, url } );
 	}
 
 	onFocusCaption() {
@@ -197,20 +210,13 @@ class ImageEdit extends React.Component {
 			return <Icon icon={ SvgIconRetry } { ...styles.iconRetry } />;
 		}
 
-		return <Icon icon={ SvgIcon } { ...styles.icon } />;
+		const iconStyle = this.props.getStylesFromColorScheme( styles.icon, styles.iconDark );
+		return <Icon icon={ SvgIcon } { ...iconStyle } />;
 	}
 
 	render() {
-		const { attributes, isSelected, setAttributes } = this.props;
-		const { url, caption, height, width, alt, href, id } = attributes;
-
-		const onImageSettingsButtonPressed = () => {
-			this.setState( { showSettings: true } );
-		};
-
-		const onImageSettingsClose = () => {
-			this.setState( { showSettings: false } );
-		};
+		const { attributes, isSelected } = this.props;
+		const { url, height, width, alt, href, id, linkTarget } = attributes;
 
 		const getToolbarEditButton = ( open ) => (
 			<BlockControls>
@@ -225,56 +231,54 @@ class ImageEdit extends React.Component {
 		);
 
 		const getInspectorControls = () => (
-			<BottomSheet
-				isVisible={ this.state.showSettings }
-				onClose={ onImageSettingsClose }
-				hideHeader
-			>
-				<BottomSheet.Cell
-					icon={ 'admin-links' }
-					label={ __( 'Link To' ) }
-					value={ href || '' }
-					valuePlaceholder={ __( 'Add URL' ) }
-					onChangeValue={ this.onSetLinkDestination }
-					autoCapitalize="none"
-					autoCorrect={ false }
-					keyboardType="url"
-				/>
-				<BottomSheet.Cell
-					icon={ 'editor-textcolor' }
-					label={ __( 'Alt Text' ) }
-					value={ alt || '' }
-					valuePlaceholder={ __( 'None' ) }
-					separatorType={ 'fullWidth' }
-					onChangeValue={ this.updateAlt }
-				/>
-				<BottomSheet.Cell
-					label={ __( 'Clear All Settings' ) }
-					labelStyle={ styles.clearSettingsButton }
-					separatorType={ 'none' }
-					onPress={ this.onClearSettings }
-				/>
-			</BottomSheet>
+			<InspectorControls>
+				<PanelBody title={ __( 'Image Settings' ) } >
+					<TextControl
+						icon={ 'admin-links' }
+						label={ __( 'Link To' ) }
+						value={ href || '' }
+						valuePlaceholder={ __( 'Add URL' ) }
+						onChange={ this.onSetLinkDestination }
+						autoCapitalize="none"
+						autoCorrect={ false }
+						keyboardType="url"
+					/>
+					<ToggleControl
+						icon={ 'external' }
+						label={ __( 'Open in new tab' ) }
+						checked={ linkTarget === '_blank' }
+						onChange={ this.onSetNewTab }
+					/>
+					<TextControl
+						icon={ 'editor-textcolor' }
+						label={ __( 'Alt Text' ) }
+						value={ alt || '' }
+						valuePlaceholder={ __( 'None' ) }
+						separatorType={ 'fullWidth' }
+						onChange={ this.updateAlt }
+					/>
+					<TextControl
+						label={ __( 'Clear All Settings' ) }
+						labelStyle={ styles.clearSettingsButton }
+						separatorType={ 'none' }
+						onPress={ this.onClearSettings }
+					/>
+				</PanelBody>
+			</InspectorControls>
 		);
 
 		if ( ! url ) {
 			return (
 				<View style={ { flex: 1 } } >
 					<MediaPlaceholder
-						mediaType={ MEDIA_TYPE_IMAGE }
-						onSelectURL={ this.onSelectMediaUploadOption }
+						allowedTypes={ [ MEDIA_TYPE_IMAGE ] }
+						onSelect={ this.onSelectMediaUploadOption }
 						icon={ this.getIcon( false ) }
 						onFocus={ this.props.onFocus }
 					/>
 				</View>
 			);
 		}
-
-		// We still want to render the caption so that the soft keyboard is not forced to close on Android
-		const shouldCaptionDisplay = () => {
-			const isCaptionEmpty = RichText.isEmpty( caption ) > 0;
-			return ! isCaptionEmpty || isSelected;
-		};
 
 		const imageContainerHeight = Dimensions.get( 'window' ).width / IMAGE_ASPECT_RATIO;
 		const getImageComponent = ( openMediaOptions, getMediaOptions ) => (
@@ -290,13 +294,6 @@ class ImageEdit extends React.Component {
 					{ ( ! this.state.isCaptionSelected ) &&
 						getToolbarEditButton( openMediaOptions )
 					}
-					<InspectorControls>
-						<ToolbarButton
-							title={ __( 'Image Settings' ) }
-							icon="admin-generic"
-							onClick={ onImageSettingsButtonPressed }
-						/>
-					</InspectorControls>
 					<MediaUploadProgress
 						height={ height }
 						width={ width }
@@ -344,45 +341,29 @@ class ImageEdit extends React.Component {
 							);
 						} }
 					/>
-					<View style={ { padding: 12, flex: 1, display: shouldCaptionDisplay() ? 'flex' : 'none' } }
+					<Caption
+						clientId={ this.props.clientId }
+						isSelected={ this.state.isCaptionSelected }
 						accessible={ true }
-						accessibilityLabel={
+						accessibilityLabelCreator={ ( caption ) =>
 							isEmpty( caption ) ?
 							/* translators: accessibility text. Empty image caption. */
-								__( 'Image caption. Empty' ) :
+								( 'Image caption. Empty' ) :
 								sprintf(
-									/* translators: accessibility text. %s: image caption. */
+								/* translators: accessibility text. %s: image caption. */
 									__( 'Image caption. %s' ),
-									caption
-								)
+									caption )
 						}
-						accessibilityRole={ 'button' }
-					>
-						<RichText
-							setRef={ ( ref ) => {
-								this._caption = ref;
-							} }
-							rootTagsToEliminate={ [ 'p' ] }
-							placeholder={ __( 'Write caption…' ) }
-							value={ caption }
-							onChange={ ( newCaption ) => setAttributes( { caption: newCaption } ) }
-							unstableOnFocus={ this.onFocusCaption }
-							onBlur={ this.props.onBlur } // always assign onBlur as props
-							isSelected={ this.state.isCaptionSelected }
-							__unstableMobileNoFocusOnMount
-							fontSize={ 14 }
-							underlineColorAndroid="transparent"
-							textAlign={ 'center' }
-							tagName={ '' }
-						/>
-					</View>
+						onFocus={ this.onFocusCaption }
+						onBlur={ this.props.onBlur } // always assign onBlur as props
+					/>
 				</View>
 			</TouchableWithoutFeedback>
 		);
 
 		return (
-			<MediaUpload mediaType={ MEDIA_TYPE_IMAGE }
-				onSelectURL={ this.onSelectMediaUploadOption }
+			<MediaUpload allowedTypes={ [ MEDIA_TYPE_IMAGE ] }
+				onSelect={ this.onSelectMediaUploadOption }
 				render={ ( { open, getMediaOptions } ) => {
 					return getImageComponent( open, getMediaOptions );
 				} }
@@ -391,4 +372,4 @@ class ImageEdit extends React.Component {
 	}
 }
 
-export default ImageEdit;
+export default withPreferredColorScheme( ImageEdit );

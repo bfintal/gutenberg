@@ -38,26 +38,26 @@ const SLOT_NAME = 'Popover';
  * Hook used trigger an event handler once the window is resized or scrolled.
  *
  * @param {Function} handler              Event handler.
- * @param {Object}   ignoredScrollalbeRef scroll events inside this element are ignored.
+ * @param {Object}   ignoredScrollableRef scroll events inside this element are ignored.
  */
-function useThrottledWindowScrollOrResize( handler, ignoredScrollalbeRef ) {
+function useThrottledWindowScrollOrResize( handler, ignoredScrollableRef ) {
 	// Refresh anchor rect on resize
 	useEffect( () => {
 		let refreshHandle;
 		const throttledRefresh = ( event ) => {
 			window.cancelAnimationFrame( refreshHandle );
-			if ( ignoredScrollalbeRef && event && event.type === 'scroll' && ignoredScrollalbeRef.current.contains( event.target ) ) {
+			if ( ignoredScrollableRef && event && event.type === 'scroll' && ignoredScrollableRef.current.contains( event.target ) ) {
 				return;
 			}
 			refreshHandle = window.requestAnimationFrame( handler );
 		};
 
 		window.addEventListener( 'resize', throttledRefresh );
-		window.addEventListener( 'scroll', throttledRefresh );
+		window.addEventListener( 'scroll', throttledRefresh, true );
 
 		return () => {
 			window.removeEventListener( 'resize', throttledRefresh );
-			window.removeEventListener( 'scroll', throttledRefresh );
+			window.removeEventListener( 'scroll', throttledRefresh, true );
 		};
 	}, [] );
 }
@@ -324,7 +324,9 @@ const Popover = ( {
 			onFocusOutside( event );
 			return;
 		} else if ( ! onClickOutside ) {
-			onClose();
+			if ( onClose ) {
+				onClose();
+			}
 			return;
 		}
 

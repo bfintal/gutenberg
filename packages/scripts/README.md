@@ -117,6 +117,56 @@ _Flags_:
 - `--gpl2`: Validates against [GPLv2 license compatibility](https://www.gnu.org/licenses/license-list.en.html)
 - `--ignore=a,b,c`: A comma-separated set of package names to ignore for validation. This is intended to be used primarily in cases where a dependency’s `license` field is malformed. It’s assumed that any `ignored` package argument would be manually vetted for compatibility by the project owner.
 
+### `env`
+
+`env` is a family of scripts for setting up a local Docker-based development environment that plugin contributors can work in.
+
+To get started, it requires some configuration in your `package.json`:
+
+_Example:_
+
+```json
+{
+	"scripts": {
+		"env": "wp-scripts env"
+	},
+	"wp-env": {
+		"plugin-dir": "gutenberg",
+		"plugin-name": "Gutenberg",
+		"docker-template": "./bin/docker-compose.override.yml.template",
+		"welcome-logo": [
+			",⁻⁻⁻·       .                 |",
+			"|  ،⁓’.   . |---  ,---. ,---. |---. ,---. ,---. ,---.",
+			"|   | |   | |     |---' |   | |   | |---' |     |   |",
+			"`---' `---' `---’ `---’ '   ` `---' `---’ `     `---|",
+			"                                                `---'"
+		],
+		"welcome-build-command": "npm run dev"
+	}
+}
+```
+
+In the `wp-env` config block, each entry can be configured like so:
+- `plugin-dir`: Required. The name of the plugin directory within `wp-content/plugins` that this plugin will be mounted in.
+- `plugin-name`: Required. The display name for this plugin.
+- `docker-template`: Optional. If you need to customize the default `docker-compose.override.yml.template`, this is the path to your customized version.
+- `welcome-logo`: Optional. An ASCII art logo to show after `npm run env install` finishes.
+- `welcome-build-command`: Optional. The build command to show after `npm run env install` finishes, helping contributors move on to the next step.
+
+#### Available Sub-Scripts
+
+- `install`: Automatically downloads, builds, and installs a copy of WordPress to work with. This will be installed in the `wordpress` folder inside your project. You should add `wordpress` to your `.gitignore` file.
+- `connect`: For contributors that have a WordPress respository already, they can define the `WP_DEVELOP_DIR` environment variable with the path to their repository, then run this command to add your plugin to it.
+- `start`: Starts the Docker containers.
+- `stop`: Stops the Docker containers.
+- `update`: For contributors that used `npm run env install` to setup WordPress, running this command will update it to the latest checkout.
+- `reinstall`: Resets the database and re-configures WordPress again.
+- `cli`: Runs WP-CLI commands against the WordPress install.
+- `lint-php`: Run PHPCS linting on your plugin. You will need to have `composer.json` configured to install PHPCS, with a `lint` script that runs your linting. You will also need to have an appropriately configured `phpcs.xml.dist` file.
+- `test-php`: Runs your plugin's PHPUnit tests. You will need to have an appropriately configured `phpunit.xml.dist` file.
+- `docker-run`: For more advanced debugging, contributors may sometimes need to run commands in the Docker containers. This is the equivalent of running `docker-compose run` within the WordPress directory.
+
+
 ### `lint-js`
 
 Helps enforce coding style guidelines for your JavaScript files.
@@ -252,6 +302,11 @@ This is how you execute those scripts using the presented setup:
 * `npm run test-e2e FILE_NAME -- --puppeteer-interactive ` - runs one test file interactively.
 * `npm run test-e2e:watch -- --puppeteer-interactive` - runs all tests interactively and watch for changes.
 
+Jest will look for test files with any of the following popular naming conventions:
+
+- Files with `.js` (or `.ts`) suffix at any level of depth in `spec` folders.
+- Files with `.spec.js` (or `.spec.ts`) suffix.
+
 This script automatically detects the best config to start Puppeteer but sometimes you may need to specify custom options:
  - You can add a `jest-puppeteer.config.js` at the root of the project or define a custom path using `JEST_PUPPETEER_CONFIG` environment variable. Check [jest-puppeteer](https://github.com/smooth-code/jest-puppeteer#jest-puppeteerconfigjs) for more details.
 
@@ -284,6 +339,12 @@ This is how you execute those scripts using the presented setup:
 * `npm run test:unit` - runs all unit tests.
 * `npm run test:unit:help` - prints all available options to configure unit tests runner.
 * `npm run test:unit:watch` - runs all unit tests in the watch mode.
+
+Jest will look for test files with any of the following popular naming conventions:
+
+- Files with `.js` (or `.ts`) suffix located at any level of depth in `__tests__` folders.
+- Files with `.js` (or `.ts`) suffix directly located in `test` folders.
+- Files with `.test.js` (or `.test.ts`) suffix.
 
 #### Advanced information
 

@@ -3,8 +3,14 @@
  */
 import { __, _x } from '@wordpress/i18n';
 import { createBlock } from '@wordpress/blocks';
-import { RichText, BlockControls, RichTextShortcut } from '@wordpress/block-editor';
-import { Toolbar } from '@wordpress/components';
+import {
+	RichText,
+	BlockControls,
+	RichTextShortcut,
+} from '@wordpress/block-editor';
+import {
+	Toolbar,
+} from '@wordpress/components';
 import {
 	__unstableIndentListItems as indentListItems,
 	__unstableOutdentListItems as outdentListItems,
@@ -17,6 +23,7 @@ import {
  * Internal dependencies
  */
 import { name } from './';
+import OrderedListSettings from './ordered-list-settings';
 
 export default function ListEdit( {
 	attributes,
@@ -25,7 +32,7 @@ export default function ListEdit( {
 	onReplace,
 	className,
 } ) {
-	const { ordered, values } = attributes;
+	const { ordered, values, reversed, start } = attributes;
 	const tagName = ordered ? 'ol' : 'ul';
 
 	const controls = ( { value, onChange } ) => {
@@ -111,7 +118,7 @@ export default function ListEdit( {
 		</>;
 	};
 
-	return (
+	return <>
 		<RichText
 			identifier="values"
 			multiline="li"
@@ -126,8 +133,17 @@ export default function ListEdit( {
 			__unstableOnSplitMiddle={ () => createBlock( 'core/paragraph' ) }
 			onReplace={ onReplace }
 			onRemove={ () => onReplace( [] ) }
+			start={ start }
+			reversed={ reversed }
 		>
 			{ controls }
 		</RichText>
-	);
+		{ ordered && (
+			<OrderedListSettings
+				setAttributes={ setAttributes }
+				ordered={ ordered }
+				reversed={ reversed }
+				start={ start }
+			/> ) }
+	</>;
 }

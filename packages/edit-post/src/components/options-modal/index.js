@@ -27,6 +27,7 @@ import {
 	EnablePublishSidebarOption,
 	EnableTipsOption,
 	EnablePanelOption,
+	EnableFeature,
 } from './options';
 import MetaBoxesSection from './meta-boxes-section';
 
@@ -45,8 +46,9 @@ export function OptionsModal( { isModalActive, isViewable, closeModal } ) {
 			onRequestClose={ closeModal }
 		>
 			<Section title={ __( 'General' ) }>
-				<EnablePublishSidebarOption label={ __( 'Enable Pre-publish Checks' ) } />
-				<EnableTipsOption label={ __( 'Enable Tips' ) } />
+				<EnablePublishSidebarOption label={ __( 'Pre-publish Checks' ) } />
+				<EnableTipsOption label={ __( 'Tips' ) } />
+				<EnableFeature feature="showInserterHelpPanel" label={ __( 'Inserter Help Panel' ) } />
 			</Section>
 			<Section title={ __( 'Document Panels' ) }>
 				<EnablePluginDocumentSettingPanelOption.Slot />
