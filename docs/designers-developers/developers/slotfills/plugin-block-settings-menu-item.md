@@ -6,20 +6,43 @@ This will either appear in the controls for each block or at the Top Toolbar dep
 
 ## Example
 
+{% codetabs %} {% ES5 %}
+
+```js
+var PluginBlockSettingsMenuGroupTest = function() {
+	return wp.element.createElement(
+		wp.editPost.PluginBlockSettingsMenuItem,
+		{
+			allowedBlocks: ['core/paragraph'],
+			icon: 'smiley',
+			label: 'Menu item text',
+			onClick: function() { alert( 'clicked' ) },
+		}
+	)
+}
+
+wp.plugins.registerPlugin( 'block-settings-menu-group-test', { render: PluginBlockSettingsMenuGroupTest } );
+```
+
+{% ESNext %}
+
 ```js
 const { registerPlugin } = wp.plugins;
 const { PluginBlockSettingsMenuItem } = wp.editPost;
 
 const PluginBlockSettingsMenuGroupTest = () => (
 	<PluginBlockSettingsMenuItem
-		allowedBlocks=['core/paragraph']
+		allowedBlocks={ ['core/paragraph'] }
 		icon='smiley'
 		label='Menu item text'
-		onClick={ () => { alert( 'clicked' )} } />
+		onClick={ () => { alert( 'clicked' )} }
+	/>
 )
 
 registerPlugin( 'block-settings-menu-group-test', { render: PluginBlockSettingsMenuGroupTest } );
 ```
+
+{% end %}
 
 ## Location
 
