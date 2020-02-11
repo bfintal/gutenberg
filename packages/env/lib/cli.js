@@ -28,12 +28,19 @@ const withSpinner = ( command ) => ( ...args ) => {
 		( message ) => {
 			time = process.hrtime( time );
 			spinner.succeed(
-				`${ message || spinner.text } (in ${ time[ 0 ] }s ${ ( time[ 1 ] / 1e6 ).toFixed(
-					0
-				) }ms)`
+				`${ message || spinner.text } (in ${ time[ 0 ] }s ${ (
+					time[ 1 ] / 1e6
+				).toFixed( 0 ) }ms)`
 			);
 		},
-		( err ) => spinner.fail( err.message || err.err )
+		( error ) => {
+			spinner.fail( error.message || error.err );
+			if ( ! ( error instanceof env.ValidationError ) ) {
+				// eslint-disable-next-line no-console
+				console.error( `\n\n${ error.out || error.err }\n\n` );
+			}
+			process.exit( error.exitCode || 1 );
+		}
 	);
 };
 
@@ -41,7 +48,7 @@ module.exports = function cli() {
 	yargs.usage( wpPrimary( '$0 <command>' ) );
 
 	yargs.command(
-		'start [ref]',
+		'start',
 		wpGreen(
 			chalk`Starts WordPress for development on port {bold.underline ${ terminalLink(
 				'8888',
@@ -49,16 +56,9 @@ module.exports = function cli() {
 			) }} (override with WP_ENV_PORT) and tests on port {bold.underline ${ terminalLink(
 				'8889',
 				'http://localhost:8889'
-			) }} (override with WP_ENV_TESTS_PORT). If the current working directory is a plugin and/or has e2e-tests with plugins and/or mu-plugins, they will be mounted appropriately.`
+			) }} (override with WP_ENV_TESTS_PORT). The current working directory must be a WordPress installation, a plugin, a theme, or contain a .wp-env.json file.`
 		),
-		( args ) => {
-			args.positional( 'ref', {
-				type: 'string',
-				describe:
-					'A `https://github.com/WordPress/WordPress` git repo branch or commit for choosing a specific version.',
-				default: 'master',
-			} );
-		},
+		() => {},
 		withSpinner( env.start )
 	);
 	yargs.command(
@@ -81,6 +81,21 @@ module.exports = function cli() {
 			} );
 		},
 		withSpinner( env.clean )
+	);
+	yargs.command(
+		'run <container> [command..]',
+		'Runs an arbitrary command in one of the underlying Docker containers.',
+		( args ) => {
+			args.positional( 'container', {
+				type: 'string',
+				describe: 'The container to run the command on.',
+			} );
+			args.positional( 'command', {
+				type: 'string',
+				describe: 'The command to run.',
+			} );
+		},
+		withSpinner( env.run )
 	);
 
 	return yargs;

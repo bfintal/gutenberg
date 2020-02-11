@@ -17,21 +17,15 @@ jest.mock( '../lib/env', () => ( {
 	start: jest.fn( Promise.resolve.bind( Promise ) ),
 	stop: jest.fn( Promise.resolve.bind( Promise ) ),
 	clean: jest.fn( Promise.resolve.bind( Promise ) ),
+	ValidationError: jest.requireActual( '../lib/env' ).ValidationError,
 } ) );
 
 describe( 'env cli', () => {
 	beforeEach( jest.clearAllMocks );
 
-	it( 'parses start commands for the default ref.', () => {
+	it( 'parses start commands.', () => {
 		cli().parse( [ 'start' ] );
-		const { ref, spinner } = env.start.mock.calls[ 0 ][ 0 ];
-		expect( ref ).toBe( 'master' );
-		expect( spinner.text ).toBe( '' );
-	} );
-	it( 'parses start commands for an explicit ref.', () => {
-		cli().parse( [ 'start', 'explicit' ] );
-		const { ref, spinner } = env.start.mock.calls[ 0 ][ 0 ];
-		expect( ref ).toBe( 'explicit' );
+		const { spinner } = env.start.mock.calls[ 0 ][ 0 ];
 		expect( spinner.text ).toBe( '' );
 	} );
 
@@ -87,17 +81,45 @@ describe( 'env cli', () => {
 	} );
 
 	it( 'handles failed commands with messages.', async () => {
-		env.start.mockRejectedValueOnce( { message: 'failure message' } );
+		/* eslint-disable no-console */
+		env.start.mockRejectedValueOnce( {
+			message: 'failure message',
+			out: 'failure message',
+			exitCode: 2,
+		} );
+		const consoleError = console.error;
+		console.error = jest.fn();
+		const processExit = process.exit;
+		process.exit = jest.fn();
+
 		cli().parse( [ 'start' ] );
 		const { spinner } = env.start.mock.calls[ 0 ][ 0 ];
 		await env.start.mock.results[ 0 ].value.catch( () => {} );
+
 		expect( spinner.fail ).toHaveBeenCalledWith( 'failure message' );
+		expect( console.error ).toHaveBeenCalled();
+		expect( process.exit ).toHaveBeenCalledWith( 2 );
+		console.error = consoleError;
+		process.exit = processExit;
+		/* eslint-enable no-console */
 	} );
 	it( 'handles failed commands with errors.', async () => {
+		/* eslint-disable no-console */
 		env.start.mockRejectedValueOnce( { err: 'failure error' } );
+		const consoleError = console.error;
+		console.error = jest.fn();
+		const processExit = process.exit;
+		process.exit = jest.fn();
+
 		cli().parse( [ 'start' ] );
 		const { spinner } = env.start.mock.calls[ 0 ][ 0 ];
 		await env.start.mock.results[ 0 ].value.catch( () => {} );
+
 		expect( spinner.fail ).toHaveBeenCalledWith( 'failure error' );
+		expect( console.error ).toHaveBeenCalled();
+		expect( process.exit ).toHaveBeenCalledWith( 1 );
+		console.error = consoleError;
+		process.exit = processExit;
+		/* eslint-enable no-console */
 	} );
 } );

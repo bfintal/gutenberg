@@ -13,7 +13,7 @@ import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
-import IconButton from '../icon-button';
+import Button from '../button';
 import VisuallyHidden from '../visually-hidden';
 
 export default function Token( {
@@ -61,11 +61,13 @@ export default function Token( {
 				className="components-form-token-field__token-text"
 				id={ `components-form-token-field__token-text-${ instanceId }` }
 			>
-				<VisuallyHidden as="span">{ termPositionAndCount }</VisuallyHidden>
+				<VisuallyHidden as="span">
+					{ termPositionAndCount }
+				</VisuallyHidden>
 				<span aria-hidden="true">{ transformedValue }</span>
 			</span>
 
-			<IconButton
+			<Button
 				className="components-form-token-field__remove-token"
 				icon="dismiss"
 				onClick={ ! disabled && onClick }
