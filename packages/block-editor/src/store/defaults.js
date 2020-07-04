@@ -25,20 +25,34 @@ export const PREFERENCES_DEFAULTS = {
  * @property {boolean} focusMode Whether the focus mode is enabled or not
  * @property {Array} styles Editor Styles
  * @property {boolean} isRTL Whether the editor is in RTL mode
+ * @property {boolean} keepCaretInsideBlock Whether caret should move between blocks in edit mode
  * @property {string} bodyPlaceholder Empty post placeholder
  * @property {string} titlePlaceholder Empty title placeholder
  * @property {boolean} codeEditingEnabled Whether or not the user can switch to the code editor
- * @property {boolean} showInserterHelpPanel Whether or not the inserter help panel is shown
  * @property {boolean} __experimentalCanUserUseUnfilteredHTML Whether the user should be able to use unfiltered HTML or the HTML should be filtered e.g., to remove elements considered insecure like iframes.
  * @property {boolean} __experimentalEnableLegacyWidgetBlock Whether the user has enabled the Legacy Widget Block
  * @property {boolean} __experimentalBlockDirectory Whether the user has enabled the Block Directory
  * @property {boolean} __experimentalEnableFullSiteEditing Whether the user has enabled Full Site Editing
  * @property {boolean} __experimentalEnableFullSiteEditingDemo Whether the user has enabled Full Site Editing Demo Templates
- * @property {boolean} __experimentalEnablePageTemplates Whether the user has enabled the Page Templates
  */
 export const SETTINGS_DEFAULTS = {
 	alignWide: false,
 	colors: [
+		{
+			name: __( 'Black' ),
+			slug: 'black',
+			color: '#000000',
+		},
+		{
+			name: __( 'Cyan bluish gray' ),
+			slug: 'cyan-bluish-gray',
+			color: '#abb8c3',
+		},
+		{
+			name: __( 'White' ),
+			slug: 'white',
+			color: '#ffffff',
+		},
 		{
 			name: __( 'Pale pink' ),
 			slug: 'pale-pink',
@@ -79,21 +93,6 @@ export const SETTINGS_DEFAULTS = {
 			name: __( 'Vivid purple' ),
 			slug: 'vivid-purple',
 			color: '#9b51e0',
-		},
-		{
-			name: __( 'Very light gray' ),
-			slug: 'very-light-gray',
-			color: '#eeeeee',
-		},
-		{
-			name: __( 'Cyan bluish gray' ),
-			slug: 'cyan-bluish-gray',
-			color: '#abb8c3',
-		},
-		{
-			name: __( 'Very dark gray' ),
-			slug: 'very-dark-gray',
-			color: '#313131',
 		},
 	],
 
@@ -147,13 +146,12 @@ export const SETTINGS_DEFAULTS = {
 
 	availableLegacyWidgets: {},
 	hasPermissionsToManageWidgets: false,
-	showInserterHelpPanel: true,
 	__experimentalCanUserUseUnfilteredHTML: false,
 	__experimentalEnableLegacyWidgetBlock: false,
 	__experimentalBlockDirectory: false,
 	__experimentalEnableFullSiteEditing: false,
 	__experimentalEnableFullSiteEditingDemo: false,
-	__experimentalEnablePageTemplates: false,
+	__mobileEnablePageTemplates: false,
 	gradients: [
 		{
 			name: __( 'Vivid cyan blue to vivid purple' ),

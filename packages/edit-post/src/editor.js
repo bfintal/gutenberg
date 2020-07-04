@@ -41,13 +41,14 @@ class Editor extends Component {
 	getEditorSettings(
 		settings,
 		hasFixedToolbar,
-		showInserterHelpPanel,
 		focusMode,
 		hiddenBlockTypes,
 		blockTypes,
 		preferredStyleVariations,
 		__experimentalLocalAutosaveInterval,
-		updatePreferredStyleVariations
+		__experimentalSetIsInserterOpened,
+		updatePreferredStyleVariations,
+		keepCaretInsideBlock
 	) {
 		settings = {
 			...settings,
@@ -57,8 +58,11 @@ class Editor extends Component {
 			},
 			hasFixedToolbar,
 			focusMode,
-			showInserterHelpPanel,
 			__experimentalLocalAutosaveInterval,
+
+			// This is marked as experimental to give time for the quick inserter to mature.
+			__experimentalSetIsInserterOpened,
+			keepCaretInsideBlock,
 		};
 
 		// Omit hidden block types if exists and non-empty.
@@ -93,8 +97,9 @@ class Editor extends Component {
 			blockTypes,
 			preferredStyleVariations,
 			__experimentalLocalAutosaveInterval,
-			showInserterHelpPanel,
+			setIsInserterOpened,
 			updatePreferredStyleVariations,
+			keepCaretInsideBlock,
 			...props
 		} = this.props;
 
@@ -105,13 +110,14 @@ class Editor extends Component {
 		const editorSettings = this.getEditorSettings(
 			settings,
 			hasFixedToolbar,
-			showInserterHelpPanel,
 			focusMode,
 			hiddenBlockTypes,
 			blockTypes,
 			preferredStyleVariations,
 			__experimentalLocalAutosaveInterval,
-			updatePreferredStyleVariations
+			setIsInserterOpened,
+			updatePreferredStyleVariations,
+			keepCaretInsideBlock
 		);
 
 		return (
@@ -145,13 +151,18 @@ class Editor extends Component {
 
 export default compose( [
 	withSelect( ( select, { postId, postType } ) => {
-		const { isFeatureActive, getPreference } = select( 'core/edit-post' );
+		const {
+			isFeatureActive,
+			getPreference,
+			__experimentalGetPreviewDeviceType,
+		} = select( 'core/edit-post' );
 		const { getEntityRecord } = select( 'core' );
 		const { getBlockTypes } = select( 'core/blocks' );
 
 		return {
-			showInserterHelpPanel: isFeatureActive( 'showInserterHelpPanel' ),
-			hasFixedToolbar: isFeatureActive( 'fixedToolbar' ),
+			hasFixedToolbar:
+				isFeatureActive( 'fixedToolbar' ) ||
+				__experimentalGetPreviewDeviceType() !== 'Desktop',
 			focusMode: isFeatureActive( 'focusMode' ),
 			post: getEntityRecord( 'postType', postType, postId ),
 			preferredStyleVariations: getPreference(
@@ -162,12 +173,17 @@ export default compose( [
 			__experimentalLocalAutosaveInterval: getPreference(
 				'localAutosaveInterval'
 			),
+			keepCaretInsideBlock: isFeatureActive( 'keepCaretInsideBlock' ),
 		};
 	} ),
 	withDispatch( ( dispatch ) => {
-		const { updatePreferredStyleVariations } = dispatch( 'core/edit-post' );
+		const {
+			updatePreferredStyleVariations,
+			setIsInserterOpened,
+		} = dispatch( 'core/edit-post' );
 		return {
 			updatePreferredStyleVariations,
+			setIsInserterOpened,
 		};
 	} ),
 ] )( Editor );

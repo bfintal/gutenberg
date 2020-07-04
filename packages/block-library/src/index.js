@@ -2,6 +2,7 @@
  * WordPress dependencies
  */
 import '@wordpress/core-data';
+import '@wordpress/notices';
 import '@wordpress/block-editor';
 import {
 	registerBlockType,
@@ -61,15 +62,24 @@ import * as tagCloud from './tag-cloud';
 import * as classic from './classic';
 import * as socialLinks from './social-links';
 import * as socialLink from './social-link';
+import * as widgetArea from './widget-area';
 
 // Full Site Editing Blocks
 import * as siteTitle from './site-title';
 import * as templatePart from './template-part';
+import * as query from './query';
+import * as queryLoop from './query-loop';
+import * as queryPagination from './query-pagination';
 import * as postTitle from './post-title';
 import * as postContent from './post-content';
 import * as postAuthor from './post-author';
+import * as postComments from './post-comments';
+import * as postCommentsCount from './post-comments-count';
+import * as postCommentsForm from './post-comments-form';
 import * as postDate from './post-date';
 import * as postExcerpt from './post-excerpt';
+import * as postFeaturedImage from './post-featured-image';
+import * as postTags from './post-tags';
 
 /**
  * Function to register an individual block.
@@ -156,10 +166,7 @@ export const registerCoreBlocks = () => {
 		setFreeformContentHandlerName( classic.name );
 	}
 	setUnregisteredTypeHandlerName( missing.name );
-
-	if ( group ) {
-		setGroupingBlockName( group.name );
-	}
+	setGroupingBlockName( group.name );
 };
 
 /**
@@ -183,6 +190,7 @@ export const __experimentalRegisterExperimentalCoreBlocks =
 				} = settings;
 
 				[
+					widgetArea,
 					__experimentalEnableLegacyWidgetBlock ? legacyWidget : null,
 					navigation,
 					navigationLink,
@@ -192,11 +200,19 @@ export const __experimentalRegisterExperimentalCoreBlocks =
 						? [
 								siteTitle,
 								templatePart,
+								query,
+								queryLoop,
+								queryPagination,
 								postTitle,
 								postContent,
 								postAuthor,
+								postComments,
+								postCommentsCount,
+								postCommentsForm,
 								postDate,
 								postExcerpt,
+								postFeaturedImage,
+								postTags,
 						  ]
 						: [] ),
 				].forEach( registerBlock );

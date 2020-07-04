@@ -9,7 +9,7 @@ import {
 	pressKeyWithModifier,
 } from '@wordpress/e2e-test-utils';
 
-describe( 'adding blocks', () => {
+describe( 'Block Switcher', () => {
 	beforeEach( async () => {
 		await createNewPost();
 	} );
@@ -28,6 +28,7 @@ describe( 'adding blocks', () => {
 			'Group',
 			'Paragraph',
 			'Quote',
+			'Pullquote',
 		] );
 	} );
 
@@ -49,15 +50,19 @@ describe( 'adding blocks', () => {
 		expect( await getAvailableBlockTransforms() ).toEqual( [
 			'Group',
 			'Paragraph',
+			'Pullquote',
 		] );
 	} );
 
 	it( 'Should not show the block switcher if all the blocks the list block transforms into are removed', async () => {
 		// Remove the paragraph and quote block from the list of registered blocks.
 		await page.evaluate( () => {
-			[ 'core/quote', 'core/paragraph', 'core/group' ].map( ( block ) =>
-				wp.blocks.unregisterBlockType( block )
-			);
+			[
+				'core/quote',
+				'core/pullquote',
+				'core/paragraph',
+				'core/group',
+			].map( ( block ) => wp.blocks.unregisterBlockType( block ) );
 		} );
 
 		// Insert a list block.

@@ -14,7 +14,7 @@ import {
 	BlockSelectionClearer,
 	MultiSelectScrollIntoView,
 	__experimentalBlockSettingsMenuFirstItem,
-	__experimentalBlockSettingsMenuPluginsExtension,
+	__experimentalUseResizeCanvas as useResizeCanvas,
 } from '@wordpress/block-editor';
 import { Popover } from '@wordpress/components';
 
@@ -22,11 +22,20 @@ import { Popover } from '@wordpress/components';
  * Internal dependencies
  */
 import BlockInspectorButton from './block-inspector-button';
-import PluginBlockSettingsMenuGroup from '../block-settings-menu/plugin-block-settings-menu-group';
+import { useSelect } from '@wordpress/data';
 
 function VisualEditor() {
+	const deviceType = useSelect( ( select ) => {
+		return select( 'core/edit-post' ).__experimentalGetPreviewDeviceType();
+	}, [] );
+
+	const inlineStyles = useResizeCanvas( deviceType );
+
 	return (
-		<BlockSelectionClearer className="edit-post-visual-editor editor-styles-wrapper">
+		<BlockSelectionClearer
+			className="edit-post-visual-editor editor-styles-wrapper"
+			style={ inlineStyles }
+		>
 			<VisualEditorGlobalKeyboardShortcuts />
 			<MultiSelectScrollIntoView />
 			<Popover.Slot name="block-toolbar" />
@@ -34,10 +43,10 @@ function VisualEditor() {
 				<CopyHandler>
 					<WritingFlow>
 						<ObserveTyping>
-							<CopyHandler>
+							<div className="edit-post-visual-editor__post-title-wrapper">
 								<PostTitle />
-								<BlockList />
-							</CopyHandler>
+							</div>
+							<BlockList />
 						</ObserveTyping>
 					</WritingFlow>
 				</CopyHandler>
@@ -47,13 +56,6 @@ function VisualEditor() {
 					<BlockInspectorButton onClick={ onClose } />
 				) }
 			</__experimentalBlockSettingsMenuFirstItem>
-			<__experimentalBlockSettingsMenuPluginsExtension>
-				{ ( { clientIds, onClose } ) => (
-					<PluginBlockSettingsMenuGroup.Slot
-						fillProps={ { clientIds, onClose } }
-					/>
-				) }
-			</__experimentalBlockSettingsMenuPluginsExtension>
 		</BlockSelectionClearer>
 	);
 }

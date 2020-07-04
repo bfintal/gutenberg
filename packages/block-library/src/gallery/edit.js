@@ -11,6 +11,7 @@ import {
 	map,
 	reduce,
 	some,
+	toString,
 } from 'lodash';
 
 /**
@@ -19,10 +20,10 @@ import {
 import { compose } from '@wordpress/compose';
 import {
 	PanelBody,
-	RangeControl,
 	SelectControl,
 	ToggleControl,
 	withNotices,
+	RangeControl,
 } from '@wordpress/components';
 import { MediaPlaceholder, InspectorControls } from '@wordpress/block-editor';
 import { Component, Platform } from '@wordpress/element';
@@ -53,15 +54,9 @@ const PLACEHOLDER_TEXT = Platform.select( {
 	native: __( 'ADD MEDIA' ),
 } );
 
-// currently this is needed for consistent controls UI on mobile
-// this can be removed after control components settle on consistent defaults
-const MOBILE_CONTROL_PROPS = Platform.select( {
+const MOBILE_CONTROL_PROPS_RANGE_CONTROL = Platform.select( {
 	web: {},
-	native: { separatorType: 'fullWidth' },
-} );
-const MOBILE_CONTROL_PROPS_SEPARATOR_NONE = Platform.select( {
-	web: {},
-	native: { separatorType: 'none' },
+	native: { type: 'stepper' },
 } );
 
 class GalleryEdit extends Component {
@@ -70,6 +65,7 @@ class GalleryEdit extends Component {
 
 		this.onSelectImage = this.onSelectImage.bind( this );
 		this.onSelectImages = this.onSelectImages.bind( this );
+		this.onDeselectImage = this.onDeselectImage.bind( this );
 		this.setLinkTo = this.setLinkTo.bind( this );
 		this.setColumnsNumber = this.setColumnsNumber.bind( this );
 		this.toggleImageCrop = this.toggleImageCrop.bind( this );
@@ -100,7 +96,9 @@ class GalleryEdit extends Component {
 		if ( attributes.images ) {
 			attributes = {
 				...attributes,
-				ids: map( attributes.images, 'id' ),
+				// Unlike images[ n ].id which is a string, always ensure the
+				// ids array contains numbers as per its attribute type.
+				ids: map( attributes.images, ( { id } ) => parseInt( id, 10 ) ),
 			};
 		}
 
@@ -112,6 +110,16 @@ class GalleryEdit extends Component {
 			if ( this.state.selectedImage !== index ) {
 				this.setState( {
 					selectedImage: index,
+				} );
+			}
+		};
+	}
+
+	onDeselectImage( index ) {
+		return () => {
+			if ( this.state.selectedImage === index ) {
+				this.setState( {
+					selectedImage: null,
 				} );
 			}
 		};
@@ -159,7 +167,11 @@ class GalleryEdit extends Component {
 	}
 
 	selectCaption( newImage, images, attachmentCaptions ) {
-		const currentImage = find( images, { id: newImage.id } );
+		// The image id in both the images and attachmentCaptions arrays is a
+		// string, so ensure comparison works correctly by converting the
+		// newImage.id to a string.
+		const newImageId = toString( newImage.id );
+		const currentImage = find( images, { id: newImageId } );
 
 		const currentImageCaption = currentImage
 			? currentImage.caption
@@ -169,7 +181,9 @@ class GalleryEdit extends Component {
 			return currentImageCaption;
 		}
 
-		const attachment = find( attachmentCaptions, { id: newImage.id } );
+		const attachment = find( attachmentCaptions, {
+			id: newImageId,
+		} );
 
 		// if the attachment caption is updated
 		if ( attachment && attachment.caption !== newImage.caption ) {
@@ -184,7 +198,9 @@ class GalleryEdit extends Component {
 		const { attachmentCaptions } = this.state;
 		this.setState( {
 			attachmentCaptions: newImages.map( ( newImage ) => ( {
-				id: newImage.id,
+				// Store the attachmentCaption id as a string for consistency
+				// with the type of the id in the images attribute.
+				id: toString( newImage.id ),
 				caption: newImage.caption,
 			} ) ),
 		} );
@@ -196,6 +212,10 @@ class GalleryEdit extends Component {
 					images,
 					attachmentCaptions
 				),
+				// The id value is stored in a data attribute, so when the
+				// block is parsed it's converted to a string. Converting
+				// to a string here ensures it's type is consistent.
+				id: toString( newImage.id ),
 			} ) ),
 			columns: columns ? Math.min( newImages.length, columns ) : columns,
 		} );
@@ -314,7 +334,13 @@ class GalleryEdit extends Component {
 	}
 
 	render() {
-		const { attributes, className, isSelected, noticeUI } = this.props;
+		const {
+			attributes,
+			className,
+			isSelected,
+			noticeUI,
+			insertBlocksAfter,
+		} = this.props;
 		const {
 			columns = defaultColumnsNumber( attributes ),
 			imageCrop,
@@ -324,11 +350,10 @@ class GalleryEdit extends Component {
 		} = attributes;
 
 		const hasImages = !! images.length;
-		const hasImagesWithId = hasImages && some( images, ( { id } ) => id );
 
 		const mediaPlaceholder = (
 			<MediaPlaceholder
-				addToGallery={ hasImagesWithId }
+				addToGallery={ hasImages }
 				isAppender={ hasImages }
 				className={ className }
 				disableMediaButtons={ hasImages && ! isSelected }
@@ -341,7 +366,7 @@ class GalleryEdit extends Component {
 				accept="image/*"
 				allowedTypes={ ALLOWED_MEDIA_TYPES }
 				multiple
-				value={ hasImagesWithId ? images : undefined }
+				value={ images }
 				onError={ this.onUploadError }
 				notices={ hasImages ? undefined : noticeUI }
 				onFocus={ this.props.onFocus }
@@ -355,10 +380,6 @@ class GalleryEdit extends Component {
 		const imageSizeOptions = this.getImagesSizeOptions();
 		const shouldShowSizeOptions =
 			hasImages && ! isEmpty( imageSizeOptions );
-		// This is needed to fix a separator fence-post issue on mobile.
-		const mobileLinkToProps = shouldShowSizeOptions
-			? MOBILE_CONTROL_PROPS
-			: MOBILE_CONTROL_PROPS_SEPARATOR_NONE;
 
 		return (
 			<>
@@ -367,32 +388,30 @@ class GalleryEdit extends Component {
 						{ images.length > 1 && (
 							<RangeControl
 								label={ __( 'Columns' ) }
-								{ ...MOBILE_CONTROL_PROPS }
 								value={ columns }
 								onChange={ this.setColumnsNumber }
 								min={ 1 }
 								max={ Math.min( MAX_COLUMNS, images.length ) }
+								{ ...MOBILE_CONTROL_PROPS_RANGE_CONTROL }
 								required
 							/>
 						) }
+
 						<ToggleControl
-							label={ __( 'Crop Images' ) }
-							{ ...MOBILE_CONTROL_PROPS }
+							label={ __( 'Crop images' ) }
 							checked={ !! imageCrop }
 							onChange={ this.toggleImageCrop }
 							help={ this.getImageCropHelp }
 						/>
 						<SelectControl
-							label={ __( 'Link To' ) }
-							{ ...mobileLinkToProps }
+							label={ __( 'Link to' ) }
 							value={ linkTo }
 							onChange={ this.setLinkTo }
 							options={ linkOptions }
 						/>
 						{ shouldShowSizeOptions && (
 							<SelectControl
-								label={ __( 'Images Size' ) }
-								{ ...MOBILE_CONTROL_PROPS_SEPARATOR_NONE }
+								label={ __( 'Image size' ) }
 								value={ sizeSlug }
 								options={ imageSizeOptions }
 								onChange={ this.updateImagesSize }
@@ -409,8 +428,10 @@ class GalleryEdit extends Component {
 					onMoveForward={ this.onMoveForward }
 					onRemoveImage={ this.onRemoveImage }
 					onSelectImage={ this.onSelectImage }
+					onDeselectImage={ this.onDeselectImage }
 					onSetImageAttributes={ this.setImageAttributes }
 					onFocusGalleryCaption={ this.onFocusGalleryCaption }
+					insertBlocksAfter={ insertBlocksAfter }
 				/>
 			</>
 		);

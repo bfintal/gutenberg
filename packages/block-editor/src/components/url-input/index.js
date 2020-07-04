@@ -32,6 +32,7 @@ class URLInput extends Component {
 		super( props );
 
 		this.onChange = this.onChange.bind( this );
+		this.onFocus = this.onFocus.bind( this );
 		this.onKeyDown = this.onKeyDown.bind( this );
 		this.selectLink = this.selectLink.bind( this );
 		this.handleOnClick = this.handleOnClick.bind( this );
@@ -54,8 +55,9 @@ class URLInput extends Component {
 		};
 	}
 
-	componentDidUpdate() {
+	componentDidUpdate( prevProps ) {
 		const { showSuggestions, selectedSuggestion } = this.state;
+		const { value } = this.props;
 
 		// only have to worry about scrolling selected suggestion into view
 		// when already expanded
@@ -79,7 +81,11 @@ class URLInput extends Component {
 			}, 100 );
 		}
 
-		if ( this.shouldShowInitialSuggestions() ) {
+		// Only attempt an update on suggestions if the input value has actually changed.
+		if (
+			prevProps.value !== value &&
+			this.shouldShowInitialSuggestions()
+		) {
 			this.updateSuggestions();
 		}
 	}
@@ -146,7 +152,6 @@ class URLInput extends Component {
 		this.isUpdatingSuggestions = true;
 
 		this.setState( {
-			showSuggestions: true,
 			selectedSuggestion: null,
 			loading: true,
 		} );
@@ -167,11 +172,13 @@ class URLInput extends Component {
 				this.setState( {
 					suggestions,
 					loading: false,
+					showSuggestions: !! suggestions.length,
 				} );
 
 				if ( !! suggestions.length ) {
 					this.props.debouncedSpeak(
 						sprintf(
+							/* translators: %s: number of results. */
 							_n(
 								'%d result found, use up and down arrow keys to navigate.',
 								'%d results found, use up and down arrow keys to navigate.',
@@ -208,7 +215,24 @@ class URLInput extends Component {
 
 		this.props.onChange( inputValue );
 		if ( ! this.props.disableSuggestions ) {
-			this.updateSuggestions( inputValue );
+			this.updateSuggestions( inputValue.trim() );
+		}
+	}
+
+	onFocus() {
+		const { suggestions } = this.state;
+		const { disableSuggestions, value } = this.props;
+
+		// When opening the link editor, if there's a value present, we want to load the suggestions pane with the results for this input search value
+		// Don't re-run the suggestions on focus if there are already suggestions present (prevents searching again when tabbing between the input and buttons)
+		if (
+			value &&
+			! disableSuggestions &&
+			! this.isUpdatingSuggestions &&
+			! ( suggestions && suggestions.length )
+		) {
+			// Ensure the suggestions are updated with the current input value
+			this.updateSuggestions( value.trim() );
 		}
 	}
 
@@ -355,7 +379,6 @@ class URLInput extends Component {
 			instanceId,
 			className,
 			isFullWidth,
-			hasBorder,
 			__experimentalRenderSuggestions: renderSuggestions,
 			placeholder = __( 'Paste URL or type to search' ),
 			value = '',
@@ -398,16 +421,17 @@ class URLInput extends Component {
 				id={ id }
 				className={ classnames( 'block-editor-url-input', className, {
 					'is-full-width': isFullWidth,
-					'has-border': hasBorder,
 				} ) }
 			>
 				<input
+					className="block-editor-url-input__input"
 					autoFocus={ autoFocus }
 					type="text"
 					aria-label={ __( 'URL' ) }
 					required
 					value={ value }
 					onChange={ this.onChange }
+					onFocus={ this.onFocus }
 					onInput={ stopEventPropagation }
 					placeholder={ placeholder }
 					onKeyDown={ this.onKeyDown }

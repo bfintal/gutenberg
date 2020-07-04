@@ -1,9 +1,3 @@
-.editor-autocompleters__block {
-	.block-editor-block-icon {
-		margin-right: 8px;
-	}
-}
-
 .editor-autocompleters__user {
 	.editor-autocompleters__no-avatar::before {
 		/* stylelint-disable */
@@ -40,6 +34,6 @@
 		flex-shrink: 0;
 	}
 	&:hover .editor-autocompleters__user-slug {
-		color: $blue-medium-300;
+		color: var(--wp-admin-theme-color);
 	}
 }

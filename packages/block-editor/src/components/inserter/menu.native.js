@@ -1,25 +1,25 @@
 /**
  * External dependencies
  */
-import { FlatList, View, Text, TouchableHighlight } from 'react-native';
+import { FlatList, View, TouchableHighlight, Dimensions } from 'react-native';
+import { pick } from 'lodash';
 
 /**
  * WordPress dependencies
  */
 import { Component } from '@wordpress/element';
-import { createBlock } from '@wordpress/blocks';
+import { createBlock, rawHandler } from '@wordpress/blocks';
 import { withDispatch, withSelect } from '@wordpress/data';
-import {
-	withInstanceId,
-	compose,
-	withPreferredColorScheme,
-} from '@wordpress/compose';
-import { BottomSheet, Icon } from '@wordpress/components';
+import { withInstanceId, compose } from '@wordpress/compose';
+import { BottomSheet } from '@wordpress/components';
 
 /**
  * Internal dependencies
  */
 import styles from './style.scss';
+import MenuItem from './menu-item.native';
+
+const MIN_COL_NUM = 3;
 
 export class InserterMenu extends Component {
 	constructor() {
@@ -27,9 +27,12 @@ export class InserterMenu extends Component {
 
 		this.onClose = this.onClose.bind( this );
 		this.onLayout = this.onLayout.bind( this );
+		this.renderItem = this.renderItem.bind( this );
 		this.state = {
-			numberOfColumns: this.calculateNumberOfColumns(),
+			numberOfColumns: MIN_COL_NUM,
 		};
+
+		Dimensions.addEventListener( 'change', this.onLayout );
 	}
 
 	componentDidMount() {
@@ -38,23 +41,45 @@ export class InserterMenu extends Component {
 
 	componentWillUnmount() {
 		this.props.hideInsertionPoint();
+		Dimensions.removeEventListener( 'change', this.onLayout );
 	}
 
-	calculateNumberOfColumns() {
-		const bottomSheetWidth = BottomSheet.getWidth();
+	calculateMinItemWidth( bottomSheetWidth ) {
+		const { paddingLeft, paddingRight } = styles.columnPadding;
+		return (
+			( bottomSheetWidth - 2 * ( paddingLeft + paddingRight ) ) /
+			MIN_COL_NUM
+		);
+	}
+
+	calculateItemWidth() {
 		const {
 			paddingLeft: itemPaddingLeft,
 			paddingRight: itemPaddingRight,
 		} = styles.modalItem;
-		const {
-			paddingLeft: containerPaddingLeft,
-			paddingRight: containerPaddingRight,
-		} = styles.content;
 		const { width: itemWidth } = styles.modalIconWrapper;
-		const itemTotalWidth = itemWidth + itemPaddingLeft + itemPaddingRight;
+		return itemWidth + itemPaddingLeft + itemPaddingRight;
+	}
+
+	calculateColumnsProperties() {
+		const bottomSheetWidth = BottomSheet.getWidth();
+		const { paddingLeft, paddingRight } = styles.columnPadding;
+		const itemTotalWidth = this.calculateItemWidth();
 		const containerTotalWidth =
-			bottomSheetWidth - ( containerPaddingLeft + containerPaddingRight );
-		return Math.floor( containerTotalWidth / itemTotalWidth );
+			bottomSheetWidth - ( paddingLeft + paddingRight );
+		const numofColumns = Math.floor( containerTotalWidth / itemTotalWidth );
+
+		if ( numofColumns < MIN_COL_NUM ) {
+			return {
+				numOfColumns: MIN_COL_NUM,
+				itemWidth: this.calculateMinItemWidth( bottomSheetWidth ),
+				maxWidth: containerTotalWidth / MIN_COL_NUM,
+			};
+		}
+		return {
+			numOfColumns: numofColumns,
+			maxWidth: containerTotalWidth / numofColumns,
+		};
 	}
 
 	onClose() {
@@ -67,25 +92,34 @@ export class InserterMenu extends Component {
 	}
 
 	onLayout() {
-		const numberOfColumns = this.calculateNumberOfColumns();
-		this.setState( { numberOfColumns } );
+		const {
+			numOfColumns,
+			itemWidth,
+			maxWidth,
+		} = this.calculateColumnsProperties();
+		const numberOfColumns = numOfColumns;
+
+		this.setState( { numberOfColumns, itemWidth, maxWidth } );
+	}
+
+	renderItem( { item } ) {
+		const { itemWidth, maxWidth } = this.state;
+		const { onSelect } = this.props;
+		return (
+			<MenuItem
+				item={ item }
+				itemWidth={ itemWidth }
+				maxWidth={ maxWidth }
+				onSelect={ onSelect }
+			/>
+		);
 	}
 
 	render() {
-		const { getStylesFromColorScheme } = this.props;
+		const { items } = this.props;
+		const { numberOfColumns } = this.state;
+
 		const bottomPadding = styles.contentBottomPadding;
-		const modalIconWrapperStyle = getStylesFromColorScheme(
-			styles.modalIconWrapper,
-			styles.modalIconWrapperDark
-		);
-		const modalIconStyle = getStylesFromColorScheme(
-			styles.modalIcon,
-			styles.modalIconDark
-		);
-		const modalItemLabelStyle = getStylesFromColorScheme(
-			styles.modalItemLabel,
-			styles.modalItemLabelDark
-		);
 
 		return (
 			<BottomSheet
@@ -94,42 +128,21 @@ export class InserterMenu extends Component {
 				contentStyle={ [ styles.content, bottomPadding ] }
 				hideHeader
 			>
-				<FlatList
-					onLayout={ this.onLayout }
-					scrollEnabled={ false }
-					key={ `InserterUI-${ this.state.numberOfColumns }` } //re-render when numberOfColumns changes
-					keyboardShouldPersistTaps="always"
-					numColumns={ this.state.numberOfColumns }
-					data={ this.props.items }
-					ItemSeparatorComponent={ () => (
-						<View style={ styles.rowSeparator } />
-					) }
-					keyExtractor={ ( item ) => item.name }
-					renderItem={ ( { item } ) => (
-						<TouchableHighlight
-							style={ styles.touchableArea }
-							underlayColor="transparent"
-							activeOpacity={ 0.5 }
-							accessibilityLabel={ item.title }
-							onPress={ () => this.props.onSelect( item ) }
-						>
-							<View style={ styles.modalItem }>
-								<View style={ modalIconWrapperStyle }>
-									<View style={ modalIconStyle }>
-										<Icon
-											icon={ item.icon.src }
-											fill={ modalIconStyle.fill }
-											size={ modalIconStyle.width }
-										/>
-									</View>
-								</View>
-								<Text style={ modalItemLabelStyle }>
-									{ item.title }
-								</Text>
-							</View>
-						</TouchableHighlight>
-					) }
-				/>
+				<TouchableHighlight accessible={ false }>
+					<FlatList
+						onLayout={ this.onLayout }
+						scrollEnabled={ false }
+						key={ `InserterUI-${ numberOfColumns }` } //re-render when numberOfColumns changes
+						keyboardShouldPersistTaps="always"
+						numColumns={ numberOfColumns }
+						data={ items }
+						ItemSeparatorComponent={ () => (
+							<View style={ styles.rowSeparator } />
+						) }
+						keyExtractor={ ( item ) => item.name }
+						renderItem={ this.renderItem }
+					/>
+				</TouchableHighlight>
 			</BottomSheet>
 		);
 	}
@@ -143,8 +156,10 @@ export default compose(
 			getBlockRootClientId,
 			getBlockSelectionEnd,
 			getSettings,
+			canInsertBlockType,
 		} = select( 'core/block-editor' );
-		const { getChildBlockNames } = select( 'core/blocks' );
+		const { getChildBlockNames, getBlockType } = select( 'core/blocks' );
+		const { getClipboard } = select( 'core/editor' );
 
 		let destinationRootClientId = rootClientId;
 		if ( ! destinationRootClientId && ! clientId && ! isAppender ) {
@@ -161,10 +176,29 @@ export default compose(
 		const {
 			__experimentalShouldInsertAtTheTop: shouldInsertAtTheTop,
 		} = getSettings();
+		const clipboard = getClipboard();
+		const clipboardBlock =
+			clipboard && rawHandler( { HTML: clipboard } )[ 0 ];
+		const shouldAddClipboardBlock =
+			clipboardBlock &&
+			canInsertBlockType( clipboardBlock.name, destinationRootClientId );
 
 		return {
 			rootChildBlocks: getChildBlockNames( destinationRootBlockName ),
-			items: getInserterItems( destinationRootClientId ),
+			items: shouldAddClipboardBlock
+				? [
+						{
+							...pick( getBlockType( clipboardBlock.name ), [
+								'name',
+								'icon',
+							] ),
+							id: 'clipboard',
+							initialAttributes: clipboardBlock.attributes,
+							innerBlocks: clipboardBlock.innerBlocks,
+						},
+						...getInserterItems( destinationRootClientId ),
+				  ]
+				: getInserterItems( destinationRootClientId ),
 			destinationRootClientId,
 			shouldInsertAtTheTop,
 		};
@@ -188,7 +222,8 @@ export default compose(
 					);
 
 					const count = getBlockCount();
-					if ( count === 1 ) {
+					// Check if there is a rootClientId because that means it is a nested replacable block and we don't want to clear/reset all blocks.
+					if ( count === 1 && ! ownProps.rootClientId ) {
 						// removing the last block is not possible with `removeBlock` action
 						// it always inserts a default block if the last of the blocks have been removed
 						clearSelectedBlock();
@@ -208,9 +243,13 @@ export default compose(
 			},
 			hideInsertionPoint,
 			onSelect( item ) {
-				const { name, initialAttributes } = item;
+				const { name, initialAttributes, innerBlocks } = item;
 
-				const insertedBlock = createBlock( name, initialAttributes );
+				const insertedBlock = createBlock(
+					name,
+					initialAttributes,
+					innerBlocks
+				);
 
 				insertBlock(
 					insertedBlock,
@@ -229,6 +268,5 @@ export default compose(
 			},
 		};
 	} ),
-	withInstanceId,
-	withPreferredColorScheme
+	withInstanceId
 )( InserterMenu );

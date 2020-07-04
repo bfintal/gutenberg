@@ -12,9 +12,7 @@ import {
 	enablePageDialogAccept,
 	isOfflineMode,
 	setBrowserViewport,
-	switchUserToAdmin,
-	switchUserToTest,
-	visitAdminPage,
+	trashAllPosts,
 } from '@wordpress/e2e-test-utils';
 
 /**
@@ -64,35 +62,6 @@ jest.setTimeout( PUPPETEER_TIMEOUT || 100000 );
 async function setupBrowser() {
 	await clearLocalStorage();
 	await setBrowserViewport( 'large' );
-}
-
-/**
- * Navigates to the post listing screen and bulk-trashes any posts which exist.
- *
- * @return {Promise} Promise resolving once posts have been trashed.
- */
-async function trashExistingPosts() {
-	await switchUserToAdmin();
-	// Visit `/wp-admin/edit.php` so we can see a list of posts and delete them.
-	await visitAdminPage( 'edit.php' );
-
-	// If this selector doesn't exist there are no posts for us to delete.
-	const bulkSelector = await page.$( '#bulk-action-selector-top' );
-	if ( ! bulkSelector ) {
-		return;
-	}
-
-	// Select all posts.
-	await page.waitForSelector( '[id^=cb-select-all-]' );
-	await page.click( '[id^=cb-select-all-]' );
-	// Select the "bulk actions" > "trash" option.
-	await page.select( '#bulk-action-selector-top', 'trash' );
-	// Submit the form to send all draft/scheduled/published posts to the trash.
-	await page.click( '#doaction' );
-	await page.waitForXPath(
-		'//*[contains(@class, "updated notice")]/p[contains(text(), "moved to the Trash.")]'
-	);
-	await switchUserToTest();
 }
 
 /**
@@ -220,6 +189,7 @@ async function runAxeTestsForBlockEditor() {
 		// See: https://github.com/WordPress/gutenberg/pull/15018.
 		disabledRules: [
 			'aria-allowed-role',
+			'aria-allowed-attr',
 			'aria-hidden-focus',
 			'aria-input-field-name',
 			'aria-valid-attr-value',
@@ -228,6 +198,7 @@ async function runAxeTestsForBlockEditor() {
 			'dlitem',
 			'duplicate-id',
 			'label',
+			'landmark-one-main',
 			'link-name',
 			'listitem',
 			'region',
@@ -237,6 +208,11 @@ async function runAxeTestsForBlockEditor() {
 			'.edit-post-layout__metaboxes',
 			// Ignores elements created by TinyMCE.
 			'.mce-container',
+			// These properties were not included in the 1.1 spec
+			// through error, they should be allowed on role="row":
+			// https://github.com/w3c/aria/issues/558
+			'[role="treegrid"] [aria-posinset]',
+			'[role="treegrid"] [aria-setsize]',
 		],
 	} );
 }
@@ -276,7 +252,8 @@ beforeAll( async () => {
 	observeConsoleLogging();
 	await simulateAdverseConditions();
 
-	await trashExistingPosts();
+	await trashAllPosts();
+	await trashAllPosts( 'wp_block' );
 	await setupBrowser();
 	await activatePlugin( 'gutenberg-test-plugin-disables-the-css-animations' );
 } );

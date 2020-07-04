@@ -1,8 +1,9 @@
-'use strict';
+/* eslint-disable jest/no-try-expect */
 /**
  * External dependencies
  */
-const { readFile } = require( 'fs' ).promises;
+const { readFile, stat } = require( 'fs' ).promises;
+const os = require( 'os' );
 
 /**
  * Internal dependencies
@@ -13,6 +14,7 @@ const detectDirectoryType = require( '../lib/detect-directory-type' );
 jest.mock( 'fs', () => ( {
 	promises: {
 		readFile: jest.fn(),
+		stat: jest.fn().mockReturnValue( Promise.resolve( false ) ),
 	},
 } ) );
 
@@ -203,6 +205,53 @@ describe( 'readConfig', () => {
 		} );
 	} );
 
+	it( 'should parse wordpress.org sources', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve(
+				JSON.stringify( {
+					plugins: [
+						'https://downloads.wordpress.org/plugin/gutenberg.zip',
+						'https://downloads.wordpress.org/plugin/gutenberg.8.1.0.zip',
+						'https://downloads.wordpress.org/theme/twentytwenty.zip',
+						'https://downloads.wordpress.org/theme/twentytwenty.1.3.zip',
+					],
+				} )
+			)
+		);
+		const config = await readConfig( '.wp-env.json' );
+		expect( config ).toMatchObject( {
+			pluginSources: [
+				{
+					type: 'zip',
+					url: 'https://downloads.wordpress.org/plugin/gutenberg.zip',
+					path: expect.stringMatching( /^\/.*gutenberg$/ ),
+					basename: 'gutenberg',
+				},
+				{
+					type: 'zip',
+					url:
+						'https://downloads.wordpress.org/plugin/gutenberg.8.1.0.zip',
+					path: expect.stringMatching( /^\/.*gutenberg$/ ),
+					basename: 'gutenberg',
+				},
+				{
+					type: 'zip',
+					url:
+						'https://downloads.wordpress.org/theme/twentytwenty.zip',
+					path: expect.stringMatching( /^\/.*twentytwenty$/ ),
+					basename: 'twentytwenty',
+				},
+				{
+					type: 'zip',
+					url:
+						'https://downloads.wordpress.org/theme/twentytwenty.1.3.zip',
+					path: expect.stringMatching( /^\/.*twentytwenty$/ ),
+					basename: 'twentytwenty',
+				},
+			],
+		} );
+	} );
+
 	it( 'should throw a validaton error if there is an unknown source', async () => {
 		readFile.mockImplementation( () =>
 			Promise.resolve( JSON.stringify( { plugins: [ 'invalid' ] } ) )
@@ -217,4 +266,285 @@ describe( 'readConfig', () => {
 			);
 		}
 	} );
+
+	it( 'should parse mappings into sources', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve(
+				JSON.stringify( {
+					mappings: {
+						test: './relative',
+						test2: 'WordPress/gutenberg#master',
+					},
+				} )
+			)
+		);
+		const { mappings } = await readConfig( '.wp-env.json' );
+		expect( mappings ).toMatchObject( {
+			test: {
+				type: 'local',
+				path: expect.stringMatching( /^\/.*relative$/ ),
+				basename: 'relative',
+			},
+			test2: {
+				type: 'git',
+				path: expect.stringMatching( /^\/.*gutenberg$/ ),
+				basename: 'gutenberg',
+			},
+		} );
+	} );
+
+	it( 'should throw a validaton error if there is an invalid mapping', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve( JSON.stringify( { mappings: { test: 'false' } } ) )
+		);
+		expect.assertions( 2 );
+		try {
+			await readConfig( '.wp-env.json' );
+		} catch ( error ) {
+			expect( error ).toBeInstanceOf( ValidationError );
+			expect( error.message ).toContain(
+				'Invalid or unrecognized source'
+			);
+		}
+	} );
+
+	it( 'throws an error if a mapping is badly formatted', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve(
+				JSON.stringify( {
+					mappings: { test: null },
+				} )
+			)
+		);
+		expect.assertions( 2 );
+		try {
+			await readConfig( '.wp-env.json' );
+		} catch ( error ) {
+			expect( error ).toBeInstanceOf( ValidationError );
+			expect( error.message ).toContain(
+				'Invalid .wp-env.json: "mapping.test" should be a string.'
+			);
+		}
+	} );
+
+	it( 'throws an error if mappings is not an object', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve(
+				JSON.stringify( {
+					mappings: 'not object',
+				} )
+			)
+		);
+		expect.assertions( 2 );
+		try {
+			await readConfig( '.wp-env.json' );
+		} catch ( error ) {
+			expect( error ).toBeInstanceOf( ValidationError );
+			expect( error.message ).toContain(
+				'Invalid .wp-env.json: "mappings" must be an object.'
+			);
+		}
+	} );
+
+	it( 'should return an empty mappings object if none are passed', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve( JSON.stringify( { mappings: {} } ) )
+		);
+		const { mappings } = await readConfig( '.wp-env.json' );
+		expect( mappings ).toEqual( {} );
+	} );
+
+	it( 'should throw a validaton error if the ports are not numbers', async () => {
+		expect.assertions( 10 );
+		await testPortNumberValidation( 'port', 'string' );
+		await testPortNumberValidation( 'testsPort', [] );
+		await testPortNumberValidation( 'port', {} );
+		await testPortNumberValidation( 'testsPort', false );
+		await testPortNumberValidation( 'port', null );
+	} );
+
+	it( 'should throw a validaton error if the ports are the same', async () => {
+		expect.assertions( 2 );
+		readFile.mockImplementation( () =>
+			Promise.resolve( JSON.stringify( { port: 8888, testsPort: 8888 } ) )
+		);
+		try {
+			await readConfig( '.wp-env.json' );
+		} catch ( error ) {
+			expect( error ).toBeInstanceOf( ValidationError );
+			expect( error.message ).toContain(
+				'Invalid .wp-env.json: "testsPort" and "port" must be different.'
+			);
+		}
+	} );
+
+	it( 'should parse custom ports', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve(
+				JSON.stringify( {
+					port: 1000,
+				} )
+			)
+		);
+		const config = await readConfig( '.wp-env.json' );
+		// Custom port is overriden while testsPort gets the deault value.
+		expect( config ).toMatchObject( {
+			port: 1000,
+			testsPort: 8889,
+		} );
+	} );
+
+	it( 'should throw an error if the port number environment variable is invalid', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve( JSON.stringify( {} ) )
+		);
+		const oldPort = process.env.WP_ENV_PORT;
+		process.env.WP_ENV_PORT = 'hello';
+		try {
+			await readConfig( '.wp-env.json' );
+		} catch ( error ) {
+			expect( error ).toBeInstanceOf( ValidationError );
+			expect( error.message ).toContain(
+				'Invalid environment variable: WP_ENV_PORT must be a number.'
+			);
+		}
+		process.env.WP_ENV_PORT = oldPort;
+	} );
+
+	it( 'should throw an error if the tests port number environment variable is invalid', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve( JSON.stringify( {} ) )
+		);
+		const oldPort = process.env.WP_ENV_TESTS_PORT;
+		process.env.WP_ENV_TESTS_PORT = 'hello';
+		try {
+			await readConfig( '.wp-env.json' );
+		} catch ( error ) {
+			expect( error ).toBeInstanceOf( ValidationError );
+			expect( error.message ).toContain(
+				'Invalid environment variable: WP_ENV_TESTS_PORT must be a number.'
+			);
+		}
+		process.env.WP_ENV_TESTS_PORT = oldPort;
+	} );
+
+	it( 'should use port environment values rather than config values if both are defined', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve(
+				JSON.stringify( {
+					port: 1000,
+					testsPort: 2000,
+				} )
+			)
+		);
+		const oldPort = process.env.WP_ENV_PORT;
+		const oldTestsPort = process.env.WP_ENV_TESTS_PORT;
+		process.env.WP_ENV_PORT = 4000;
+		process.env.WP_ENV_TESTS_PORT = 3000;
+
+		const config = await readConfig( '.wp-env.json' );
+		expect( config ).toMatchObject( {
+			port: 4000,
+			testsPort: 3000,
+		} );
+
+		process.env.WP_ENV_PORT = oldPort;
+		process.env.WP_ENV_TESTS_PORT = oldTestsPort;
+	} );
+
+	it( 'should use 8888 and 8889 as the default port and testsPort values if nothing else is specified', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve( JSON.stringify( {} ) )
+		);
+
+		const config = await readConfig( '.wp-env.json' );
+		expect( config ).toMatchObject( {
+			port: 8888,
+			testsPort: 8889,
+		} );
+	} );
+
+	it( 'should use the WP_ENV_HOME environment variable only if specified', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve( JSON.stringify( {} ) )
+		);
+		const oldEnvHome = process.env.WP_ENV_HOME;
+
+		expect.assertions( 2 );
+
+		process.env.WP_ENV_HOME = 'here/is/a/path';
+		const configWith = await readConfig( '.wp-env.json' );
+		expect(
+			configWith.workDirectoryPath.includes( 'here/is/a/path' )
+		).toBe( true );
+
+		process.env.WP_ENV_HOME = undefined;
+		const configWithout = await readConfig( '.wp-env.json' );
+		expect(
+			configWithout.workDirectoryPath.includes( 'here/is/a/path' )
+		).toBe( false );
+
+		process.env.WP_ENV_HOME = oldEnvHome;
+	} );
+
+	it( 'should use the WP_ENV_HOME environment variable on Linux', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve( JSON.stringify( {} ) )
+		);
+		const oldEnvHome = process.env.WP_ENV_HOME;
+		const oldOsPlatform = os.platform;
+		os.platform = () => 'linux';
+
+		expect.assertions( 2 );
+
+		process.env.WP_ENV_HOME = 'here/is/a/path';
+		const configWith = await readConfig( '.wp-env.json' );
+		expect(
+			configWith.workDirectoryPath.includes( 'here/is/a/path' )
+		).toBe( true );
+
+		process.env.WP_ENV_HOME = undefined;
+		const configWithout = await readConfig( '.wp-env.json' );
+		expect(
+			configWithout.workDirectoryPath.includes( 'here/is/a/path' )
+		).toBe( false );
+
+		process.env.WP_ENV_HOME = oldEnvHome;
+		os.platform = oldOsPlatform;
+	} );
+
+	it( 'should use a non-private folder with Snap-installed Docker', async () => {
+		readFile.mockImplementation( () =>
+			Promise.resolve( JSON.stringify( {} ) )
+		);
+		stat.mockReturnValue( Promise.resolve( true ) );
+
+		expect.assertions( 2 );
+
+		const config = await readConfig( '.wp-env.json' );
+		expect( config.workDirectoryPath.includes( '.wp-env' ) ).toBe( false );
+		expect( config.workDirectoryPath.includes( 'wp-env' ) ).toBe( true );
+	} );
 } );
+
+/**
+ * Tests that readConfig will throw errors when invalid port numbers are passed.
+ *
+ * @param {string} portName The name of the port to test ('port' or 'testsPort')
+ * @param {any} value A value which should throw an error.
+ */
+async function testPortNumberValidation( portName, value ) {
+	readFile.mockImplementation( () =>
+		Promise.resolve( JSON.stringify( { [ portName ]: value } ) )
+	);
+	try {
+		await readConfig( '.wp-env.json' );
+	} catch ( error ) {
+		expect( error ).toBeInstanceOf( ValidationError );
+		expect( error.message ).toContain(
+			`Invalid .wp-env.json: "${ portName }" must be an integer.`
+		);
+	}
+	jest.clearAllMocks();
+}
+/* eslint-enable jest/no-try-expect */
